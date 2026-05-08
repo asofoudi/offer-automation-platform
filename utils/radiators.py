@@ -32,6 +32,51 @@ class RadiatorQuote:
         return kcal_to_kw(self.radiator.power_kcal_h)
 
 
+@dataclass(frozen=True)
+class RadiatorQuoteLine:
+    quote: RadiatorQuote
+    quantity: int
+    notes: str = ""
+
+    @property
+    def unit_price(self) -> float:
+        return self.quote.final_price
+
+    @property
+    def line_total(self) -> float:
+        return self.quantity * self.unit_price
+
+    @property
+    def total_power_kcal_h(self) -> float:
+        return self.quantity * self.quote.radiator.power_kcal_h
+
+    @property
+    def total_power_kw(self) -> float:
+        return kcal_to_kw(self.total_power_kcal_h)
+
+
+@dataclass(frozen=True)
+class RadiatorQuotation:
+    customer_type: str
+    lines: list[RadiatorQuoteLine]
+
+    @property
+    def total(self) -> float:
+        return sum(line.line_total for line in self.lines)
+
+    @property
+    def total_quantity(self) -> int:
+        return sum(line.quantity for line in self.lines)
+
+    @property
+    def total_power_kcal_h(self) -> float:
+        return sum(line.total_power_kcal_h for line in self.lines)
+
+    @property
+    def total_power_kw(self) -> float:
+        return kcal_to_kw(self.total_power_kcal_h)
+
+
 def load_radiators(path: Path = RADIATOR_DATA_FILE) -> list[RadiatorRow]:
     with path.open("r", encoding="utf-8-sig", newline="") as file:
         reader = csv.DictReader(file)
@@ -104,6 +149,29 @@ def quote_radiator(radiator: RadiatorRow, customer_type: str) -> RadiatorQuote:
     )
 
 
+def quote_radiator_line(
+    radiator: RadiatorRow,
+    customer_type: str,
+    quantity: int,
+    notes: str = "",
+) -> RadiatorQuoteLine:
+    if quantity <= 0:
+        raise ValueError("Η ποσότητα πρέπει να είναι μεγαλύτερη από 0.")
+
+    return RadiatorQuoteLine(
+        quote=quote_radiator(radiator, customer_type),
+        quantity=quantity,
+        notes=notes.strip(),
+    )
+
+
+def build_radiator_quotation(
+    lines: list[RadiatorQuoteLine],
+    customer_type: str,
+) -> RadiatorQuotation:
+    return RadiatorQuotation(customer_type=customer_type, lines=lines)
+
+
 def kcal_to_kw(power_kcal_h: float) -> float:
     return power_kcal_h / 860.0
 
@@ -114,6 +182,32 @@ def format_eur(value: float) -> str:
 
 def format_int(value: float) -> str:
     return f"{value:,.0f}"
+
+
+def format_kw(value: float) -> str:
+    return f"{value:,.2f} kW"
+
+
+def quote_lines_for_display(lines: list[RadiatorQuoteLine]) -> list[dict[str, str]]:
+    rows = []
+    for index, line in enumerate(lines, start=1):
+        radiator = line.quote.radiator
+        rows.append(
+            {
+                "Α/Α": str(index),
+                "Τύπος πελάτη": line.quote.customer_type,
+                "Τύπος σώματος": str(radiator.body_type),
+                "Ύψος": f"{radiator.height} mm",
+                "Μήκος": f"{radiator.length_mm} mm",
+                "Ποσότητα": str(line.quantity),
+                "Ισχύς/τεμ.": f"{format_int(radiator.power_kcal_h)} kcal/h",
+                "Συνολική ισχύς": f"{format_int(line.total_power_kcal_h)} kcal/h",
+                "Τιμή/τεμ.": format_eur(line.unit_price),
+                "Σύνολο": format_eur(line.line_total),
+                "Σημειώσεις": line.notes,
+            }
+        )
+    return rows
 
 
 def rows_for_display(rows: list[RadiatorRow]) -> list[dict[str, str]]:
