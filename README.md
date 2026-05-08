@@ -1,10 +1,11 @@
 # Unified Streamlit App
 
 This repository contains a unified Streamlit shell for the existing business
-apps. The first two migrated pages are:
+apps. The migrated pages are:
 
 - Heat-pump questionnaire
 - Solar-water-heater questions and proposal calculator
+- Insulation BOM and pricing
 
 The old repositories/files are not modified. Their business logic has been
 refactored into `utils/`, while each Streamlit screen lives under `pages/`.
@@ -23,7 +24,11 @@ app.py
 pages/
   01_Heat_Pump_Questionnaire.py
   02_Solar_Questions.py
+  03_Insulation.py
+data/
+  insulation_prices.csv
 utils/
   heat_pump_questionnaire.py
+  insulation.py
   solar_questions.py
 ```
