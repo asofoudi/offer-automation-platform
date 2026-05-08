@@ -1,0 +1,13 @@
+btu_category,budget_tier,product_name,unit_price_eur,installation_easy_eur,installation_difficult_eur,notes
+9000,economy,Κλιματιστικό 9.000 BTU Economy Inverter,399.00,120.00,180.00,Ενδεικτική placeholder τιμή προϊόντος
+9000,value,Κλιματιστικό 9.000 BTU Value Inverter,499.00,120.00,180.00,Ενδεικτική placeholder τιμή προϊόντος
+9000,premium,Κλιματιστικό 9.000 BTU Premium Inverter,699.00,120.00,180.00,Ενδεικτική placeholder τιμή προϊόντος
+12000,economy,Κλιματιστικό 12.000 BTU Economy Inverter,499.00,130.00,200.00,Ενδεικτική placeholder τιμή προϊόντος
+12000,value,Κλιματιστικό 12.000 BTU Value Inverter,649.00,130.00,200.00,Ενδεικτική placeholder τιμή προϊόντος
+12000,premium,Κλιματιστικό 12.000 BTU Premium Inverter,849.00,130.00,200.00,Ενδεικτική placeholder τιμή προϊόντος
+18000,economy,Κλιματιστικό 18.000 BTU Economy Inverter,799.00,160.00,250.00,Ενδεικτική placeholder τιμή προϊόντος
+18000,value,Κλιματιστικό 18.000 BTU Value Inverter,999.00,160.00,250.00,Ενδεικτική placeholder τιμή προϊόντος
+18000,premium,Κλιματιστικό 18.000 BTU Premium Inverter,1299.00,160.00,250.00,Ενδεικτική placeholder τιμή προϊόντος
+24000,economy,Κλιματιστικό 24.000 BTU Economy Inverter,1099.00,190.00,300.00,Ενδεικτική placeholder τιμή προϊόντος
+24000,value,Κλιματιστικό 24.000 BTU Value Inverter,1399.00,190.00,300.00,Ενδεικτική placeholder τιμή προϊόντος
+24000,premium,Κλιματιστικό 24.000 BTU Premium Inverter,1799.00,190.00,300.00,Ενδεικτική placeholder τιμή προϊόντος
