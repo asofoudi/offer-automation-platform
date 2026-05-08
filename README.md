@@ -22,17 +22,24 @@ streamlit run app.py
 
 ```text
 app.py
+assets/
+  DejaVuSans.ttf
+  logo.png
 pages/
   01_Heat_Pump_Questionnaire.py
   02_Solar_Questions.py
   03_Insulation.py
   04_Radiators.py
+  05_Air_Conditioners.py
+  06_PDF_Offer_Demo.py
 data/
   insulation_prices.csv
   radiators.csv
 utils/
+  customer_form.py
   heat_pump_questionnaire.py
   insulation.py
+  pdf_offer.py
   radiators.py
   solar_questions.py
 ```

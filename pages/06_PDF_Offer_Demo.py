@@ -48,7 +48,7 @@ with company_col2:
 logo_path = st.text_input(
     "Διαδρομή λογοτύπου (προαιρετικά)",
     value="",
-    help="Χρησιμοποιήστε διαδρομή αρχείου που είναι διαθέσιμη στον υπολογιστή/server που τρέχει το Streamlit.",
+    help="Αν μείνει κενό, χρησιμοποιείται αυτόματα το assets/logo.png.",
 )
 
 st.divider()

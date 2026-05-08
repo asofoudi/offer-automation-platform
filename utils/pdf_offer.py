@@ -14,7 +14,21 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import HRFlowable, Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+ASSETS_DIR = PROJECT_ROOT / "assets"
+DEFAULT_FONT_PATH = ASSETS_DIR / "DejaVuSans.ttf"
+DEFAULT_LOGO_PATH = ASSETS_DIR / "logo.png"
+
+BRAND_PRIMARY = "#17313A"
+BRAND_SECONDARY = "#244653"
+BRAND_ACCENT = "#C59A3B"
+TEXT_DARK = "#1F2937"
+TEXT_MUTED = "#6B7280"
+BORDER_COLOR = "#D1D5DB"
+LIGHT_PANEL = "#F8FAFC"
 
 
 DEFAULT_DISCLAIMER = (
@@ -47,7 +61,7 @@ class CompanyInfo:
     email: str = ""
     tax_id: str = ""
     tax_office: str = ""
-    logo_path: str | Path | None = None
+    logo_path: str | Path | None = DEFAULT_LOGO_PATH
 
 
 @dataclass(frozen=True)
@@ -121,8 +135,8 @@ def create_offer_pdf(
         pagesize=A4,
         rightMargin=16 * mm,
         leftMargin=16 * mm,
-        topMargin=14 * mm,
-        bottomMargin=18 * mm,
+        topMargin=13 * mm,
+        bottomMargin=20 * mm,
         title=offer_title,
     )
 
@@ -147,10 +161,23 @@ def create_offer_pdf(
 
     def draw_footer(canvas: Any, document: SimpleDocTemplate) -> None:
         canvas.saveState()
+        canvas.setStrokeColor(colors.HexColor(BORDER_COLOR))
+        canvas.setLineWidth(0.35)
+        canvas.line(
+            document.leftMargin,
+            15 * mm,
+            A4[0] - document.rightMargin,
+            15 * mm,
+        )
         canvas.setFont(fonts.regular, 8)
-        canvas.setFillColor(colors.HexColor("#6B7280"))
+        canvas.setFillColor(colors.HexColor(TEXT_MUTED))
         canvas.drawString(
             document.leftMargin,
+            10 * mm,
+            company_info.name,
+        )
+        canvas.drawCentredString(
+            A4[0] / 2,
             10 * mm,
             "Ενιαία πλατφόρμα προσφορών",
         )
@@ -242,14 +269,16 @@ def add_products_table(
             hAlign="LEFT",
             style=TableStyle(
                 [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#244653")),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(BRAND_SECONDARY)),
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                     ("FONTNAME", (0, 0), (-1, 0), styles["font_bold"]),
                     ("FONTNAME", (0, 1), (-1, -1), styles["font_regular"]),
                     ("FONTSIZE", (0, 0), (-1, -1), 8.5),
-                    ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#D1D5DB")),
+                    ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.HexColor(BRAND_ACCENT)),
+                    ("INNERGRID", (0, 1), (-1, -1), 0.2, colors.HexColor(BORDER_COLOR)),
+                    ("BOX", (0, 0), (-1, -1), 0.35, colors.HexColor(BORDER_COLOR)),
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor(LIGHT_PANEL)]),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
                     ("TOPPADDING", (0, 0), (-1, -1), 6),
                 ]
@@ -306,13 +335,16 @@ def add_financing_section(
             hAlign="LEFT",
             style=TableStyle(
                 [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#244653")),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(BRAND_SECONDARY)),
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                     ("FONTNAME", (0, 0), (-1, 0), styles["font_bold"]),
                     ("FONTNAME", (0, 1), (-1, -1), styles["font_regular"]),
                     ("FONTSIZE", (0, 0), (-1, -1), 8.5),
-                    ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#D1D5DB")),
+                    ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.HexColor(BRAND_ACCENT)),
+                    ("INNERGRID", (0, 1), (-1, -1), 0.2, colors.HexColor(BORDER_COLOR)),
+                    ("BOX", (0, 0), (-1, -1), 0.35, colors.HexColor(BORDER_COLOR)),
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor(LIGHT_PANEL)]),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
                     ("TOPPADDING", (0, 0), (-1, -1), 6),
                 ]
@@ -345,33 +377,42 @@ def add_company_header(
             tax_line = f"{tax_line} | ΔΟΥ: {company.tax_office}"
         company_lines.append(tax_line)
 
-    offer_lines = [offer_title]
+    offer_lines = []
     if offer_number:
         offer_lines.append(f"Αριθμός προσφοράς: {offer_number}")
     offer_lines.append(f"Ημερομηνία: {format_offer_date(offer_date)}")
 
     left_cell = logo if logo is not None else Paragraph(paragraph_text(company.name), styles["company_name"])
-    right_cell = Paragraph(
-        paragraph_text("\n".join(offer_lines)),
-        styles["offer_meta"],
-    )
-    header_rows = [[left_cell, right_cell]]
+    center_cell = Paragraph(paragraph_text("\n".join(company_lines)), styles["company_details"])
+    right_cell = [
+        Paragraph(paragraph_text(offer_title), styles["document_title"]),
+        Paragraph(paragraph_text("\n".join(offer_lines)), styles["offer_meta"]),
+    ]
+    header_rows = [[left_cell, center_cell, right_cell]]
     elements.append(
         Table(
             header_rows,
-            colWidths=[72 * mm, 99 * mm],
+            colWidths=[48 * mm, 61 * mm, 62 * mm],
             hAlign="LEFT",
             style=TableStyle(
                 [
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("ALIGN", (1, 0), (1, 0), "RIGHT"),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                    ("ALIGN", (2, 0), (2, 0), "RIGHT"),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                    ("TOPPADDING", (0, 0), (-1, -1), 2),
                 ]
             ),
         )
     )
-    elements.append(Paragraph(paragraph_text("\n".join(company_lines)), styles["company_details"]))
-    elements.append(Spacer(1, 7 * mm))
+    elements.append(
+        HRFlowable(
+            width="100%",
+            thickness=1.2,
+            color=colors.HexColor(BRAND_ACCENT),
+            spaceBefore=3,
+            spaceAfter=9,
+        )
+    )
 
 
 def add_totals_section(
@@ -405,9 +446,12 @@ def add_totals_section(
             style=TableStyle(
                 [
                     ("FONTNAME", (0, 0), (-1, -1), styles["font_regular"]),
-                    ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#D1D5DB")),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.2, colors.HexColor(BORDER_COLOR)),
+                    ("BOX", (0, 0), (-1, -1), 0.45, colors.HexColor(BRAND_SECONDARY)),
+                    ("BACKGROUND", (0, 0), (-1, -2), colors.HexColor(LIGHT_PANEL)),
                     ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E7F0F2")),
                     ("FONTNAME", (0, -1), (-1, -1), styles["font_bold"]),
+                    ("TEXTCOLOR", (0, -1), (-1, -1), colors.HexColor(BRAND_PRIMARY)),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
                     ("TOPPADDING", (0, 0), (-1, -1), 6),
                 ]
@@ -423,7 +467,23 @@ def add_disclaimer_section(
     styles: Mapping[str, ParagraphStyle],
 ) -> None:
     elements.append(Paragraph("Παρατηρήσεις", styles["section_title"]))
-    elements.append(Paragraph(paragraph_text(disclaimer), styles["body"]))
+    elements.append(
+        Table(
+            [[Paragraph(paragraph_text(disclaimer), styles["body"])]],
+            colWidths=[171 * mm],
+            hAlign="LEFT",
+            style=TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(LIGHT_PANEL)),
+                    ("BOX", (0, 0), (-1, -1), 0.35, colors.HexColor(BORDER_COLOR)),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 7),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+                ]
+            ),
+        )
+    )
 
 
 def normalize_company(
@@ -431,7 +491,7 @@ def normalize_company(
     logo_path: str | Path | None = None,
 ) -> CompanyInfo:
     if company is None:
-        return CompanyInfo(logo_path=logo_path)
+        return CompanyInfo(logo_path=resolve_default_path(logo_path, DEFAULT_LOGO_PATH))
     if isinstance(company, CompanyInfo):
         return CompanyInfo(
             name=company.name,
@@ -440,7 +500,7 @@ def normalize_company(
             email=company.email,
             tax_id=company.tax_id,
             tax_office=company.tax_office,
-            logo_path=logo_path or company.logo_path,
+            logo_path=resolve_default_path(logo_path or company.logo_path, DEFAULT_LOGO_PATH),
         )
 
     company_data = object_to_dict(company)
@@ -451,7 +511,10 @@ def normalize_company(
         email=str(value_from(company_data, "email", "Email") or ""),
         tax_id=str(value_from(company_data, "tax_id", "vat_number", "ΑΦΜ") or ""),
         tax_office=str(value_from(company_data, "tax_office", "ΔΟΥ") or ""),
-        logo_path=logo_path or value_from(company_data, "logo_path", "Λογότυπο"),
+        logo_path=resolve_default_path(
+            logo_path or value_from(company_data, "logo_path", "Λογότυπο"),
+            DEFAULT_LOGO_PATH,
+        ),
     )
 
 
@@ -533,13 +596,23 @@ def build_offer_styles(fonts: RegisteredFonts) -> dict[str, Any]:
     return {
         "font_regular": fonts.regular,
         "font_bold": fonts.bold,
+        "document_title": ParagraphStyle(
+            "DocumentTitle",
+            parent=sample["Title"],
+            fontName=fonts.bold,
+            fontSize=22,
+            leading=25,
+            alignment=TA_RIGHT,
+            textColor=colors.HexColor(BRAND_PRIMARY),
+            spaceAfter=5,
+        ),
         "title": ParagraphStyle(
             "OfferTitle",
             parent=sample["Title"],
             fontName=fonts.bold,
-            fontSize=18,
-            leading=22,
-            textColor=colors.HexColor("#17313A"),
+            fontSize=20,
+            leading=23,
+            textColor=colors.HexColor(BRAND_PRIMARY),
             spaceAfter=5,
         ),
         "company_name": ParagraphStyle(
@@ -548,33 +621,34 @@ def build_offer_styles(fonts: RegisteredFonts) -> dict[str, Any]:
             fontName=fonts.bold,
             fontSize=13,
             leading=16,
-            textColor=colors.HexColor("#17313A"),
+            textColor=colors.HexColor(BRAND_PRIMARY),
         ),
         "company_details": ParagraphStyle(
             "CompanyDetails",
             parent=sample["Normal"],
             fontName=fonts.regular,
-            fontSize=9,
+            fontSize=8.8,
             leading=12,
-            textColor=colors.HexColor("#374151"),
+            textColor=colors.HexColor(TEXT_DARK),
         ),
         "offer_meta": ParagraphStyle(
             "OfferMeta",
             parent=sample["Normal"],
             fontName=fonts.bold,
-            fontSize=11,
-            leading=14,
+            fontSize=9.5,
+            leading=13,
             alignment=TA_RIGHT,
-            textColor=colors.HexColor("#17313A"),
+            textColor=colors.HexColor(TEXT_MUTED),
         ),
         "section_title": ParagraphStyle(
             "SectionTitle",
             parent=sample["Heading2"],
             fontName=fonts.bold,
-            fontSize=11,
-            leading=14,
-            textColor=colors.HexColor("#17313A"),
-            spaceAfter=4,
+            fontSize=12,
+            leading=15,
+            textColor=colors.HexColor(BRAND_PRIMARY),
+            spaceBefore=2,
+            spaceAfter=5,
         ),
         "body": ParagraphStyle(
             "GreekBody",
@@ -582,7 +656,7 @@ def build_offer_styles(fonts: RegisteredFonts) -> dict[str, Any]:
             fontName=fonts.regular,
             fontSize=9,
             leading=13,
-            textColor=colors.HexColor("#374151"),
+            textColor=colors.HexColor(TEXT_DARK),
         ),
         "table_header": ParagraphStyle(
             "TableHeader",
@@ -599,7 +673,7 @@ def build_offer_styles(fonts: RegisteredFonts) -> dict[str, Any]:
             fontName=fonts.bold,
             fontSize=8.5,
             leading=11,
-            textColor=colors.HexColor("#17313A"),
+            textColor=colors.HexColor(BRAND_PRIMARY),
         ),
         "table_cell": ParagraphStyle(
             "TableCell",
@@ -607,7 +681,7 @@ def build_offer_styles(fonts: RegisteredFonts) -> dict[str, Any]:
             fontName=fonts.regular,
             fontSize=8.5,
             leading=11,
-            textColor=colors.HexColor("#374151"),
+            textColor=colors.HexColor(TEXT_DARK),
         ),
         "table_cell_right": ParagraphStyle(
             "TableCellRight",
@@ -616,7 +690,7 @@ def build_offer_styles(fonts: RegisteredFonts) -> dict[str, Any]:
             fontSize=8.5,
             leading=11,
             alignment=TA_RIGHT,
-            textColor=colors.HexColor("#374151"),
+            textColor=colors.HexColor(TEXT_DARK),
         ),
     }
 
@@ -630,15 +704,15 @@ def register_greek_fonts(
     if _REGISTERED_FONTS is not None and font_path is None and bold_font_path is None:
         return _REGISTERED_FONTS
 
-    regular_path = Path(font_path).expanduser() if font_path else find_font(regular_font_candidates())
-    if regular_path is None:
+    regular_path = resolve_default_path(font_path, DEFAULT_FONT_PATH)
+    if not regular_path.exists():
         raise GreekFontError(
-            "Δεν βρέθηκε γραμματοσειρά Unicode με υποστήριξη ελληνικών. "
-            "Ορίστε font_path στο create_offer_pdf ή εγκαταστήστε Arial/DejaVu Sans."
+            "Δεν βρέθηκε η γραμματοσειρά `assets/DejaVuSans.ttf`. "
+            "Προσθέστε το αρχείο DejaVuSans.ttf στον φάκελο assets ή ορίστε font_path στο create_offer_pdf."
         )
 
-    bold_path = Path(bold_font_path).expanduser() if bold_font_path else find_font(bold_font_candidates())
-    if bold_path is None:
+    bold_path = resolve_default_path(bold_font_path, regular_path)
+    if not bold_path.exists():
         bold_path = regular_path
 
     fonts = RegisteredFonts(
@@ -662,24 +736,18 @@ def register_greek_fonts(
 
 
 def regular_font_candidates() -> list[Path]:
-    return [
-        Path("C:/Windows/Fonts/arial.ttf"),
-        Path("C:/Windows/Fonts/calibri.ttf"),
-        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
-        Path("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),
-        Path("/Library/Fonts/Arial Unicode.ttf"),
-        Path("/Library/Fonts/Arial.ttf"),
-    ]
+    return [DEFAULT_FONT_PATH]
 
 
 def bold_font_candidates() -> list[Path]:
-    return [
-        Path("C:/Windows/Fonts/arialbd.ttf"),
-        Path("C:/Windows/Fonts/calibrib.ttf"),
-        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
-        Path("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
-        Path("/Library/Fonts/Arial Bold.ttf"),
-    ]
+    return [DEFAULT_FONT_PATH]
+
+
+def resolve_default_path(value: str | Path | None, default: Path) -> Path:
+    path = Path(value).expanduser() if value else default
+    if path.is_absolute():
+        return path
+    return PROJECT_ROOT / path
 
 
 def find_font(candidates: Sequence[Path]) -> Path | None:
@@ -690,15 +758,15 @@ def find_font(candidates: Sequence[Path]) -> Path | None:
 
 
 def create_logo_image(logo_path: str | Path | None) -> Image | None:
-    if not logo_path:
+    path = resolve_default_path(logo_path, DEFAULT_LOGO_PATH)
+    if not path:
         return None
 
-    path = Path(logo_path).expanduser()
     if not path.exists():
         return None
 
     logo = Image(str(path))
-    logo._restrictSize(45 * mm, 25 * mm)
+    logo._restrictSize(46 * mm, 24 * mm)
     return logo
 
 
@@ -706,7 +774,8 @@ def base_table_style() -> TableStyle:
     return TableStyle(
         [
             ("FONTNAME", (0, 0), (-1, -1), "OfferGreekRegular"),
-            ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#D1D5DB")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.2, colors.HexColor(BORDER_COLOR)),
+            ("BOX", (0, 0), (-1, -1), 0.35, colors.HexColor(BORDER_COLOR)),
             ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#F1F5F9")),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
