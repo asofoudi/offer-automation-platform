@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from datetime import datetime
+
 import streamlit as st
 
 from utils.solar_questions import (
@@ -7,9 +11,244 @@ from utils.solar_questions import (
     pick_capacity_from_people,
 )
 
+try:
+    from utils.pdf_offer import (
+        FinancingOption,
+        GreekFontError,
+        OfferTotals,
+        ProductLine,
+        create_offer_pdf,
+    )
+except ModuleNotFoundError as exc:
+    FinancingOption = None
+    GreekFontError = RuntimeError
+    OfferTotals = None
+    ProductLine = None
+    create_offer_pdf = None
+    PDF_IMPORT_ERROR = exc
+else:
+    PDF_IMPORT_ERROR = None
+
 
 YES = "Ναι"
 NO = "Όχι"
+
+SOLAR_DISCLAIMER = (
+    "Η παρούσα προσφορά είναι προκοστολόγηση βάσει των στοιχείων που δηλώθηκαν. "
+    "Η τελική τιμή επιβεβαιώνεται μετά από αυτοψία, έλεγχο πρόσβασης, σωληνώσεων, "
+    "στέγης/ταράτσας, σκίασης, προσανατολισμού και συνθηκών εγκατάστασης. "
+    "Οι επιδοτήσεις και οι δόσεις είναι ενδεικτικές και απαιτούν τελική έγκριση."
+)
+
+
+def model_label(model) -> str:
+    return (
+        f"{model.brand} {model.capacity} lt, "
+        f"συλλέκτης {model.area:.2f} m², {model.kind_label}"
+    )
+
+
+def amount_label(value: float) -> str:
+    return format_eur(value)
+
+
+def option_notes(
+    *,
+    product_price: float,
+    install_cost: float,
+    total: float,
+    customer_share: float,
+    monthly_payment: float,
+    has_program: bool,
+    subsidy_rate: float,
+    wants_install: bool,
+) -> str:
+    lines = [f"Τιμή προϊόντος με ΦΠΑ: {amount_label(product_price)}"]
+    if wants_install:
+        lines.append(f"Εγκατάσταση: {amount_label(install_cost)}")
+    else:
+        lines.append("Δεν έχει υπολογιστεί εγκατάσταση. Η πρόταση αφορά μόνο αγορά προϊόντος.")
+    lines.append(f"Σύνολο πακέτου: {amount_label(total)}")
+    if has_program:
+        lines.append(
+            f"Εκτιμώμενη ίδια συμμετοχή με επιδότηση {int(subsidy_rate * 100)}%: "
+            f"{amount_label(customer_share)}"
+        )
+    else:
+        lines.append("Δεν υπάρχει πρόγραμμα. Έχει εφαρμοστεί έκπτωση 5% στην τιμή προϊόντος.")
+        lines.append(f"Ενδεικτικό ποσό πληρωμής: {amount_label(customer_share)}")
+    if monthly_payment > 0:
+        lines.append(f"Ενδεικτική δόση 36 μηνών: {amount_label(monthly_payment)} / μήνα")
+    return "\n".join(lines)
+
+
+def build_solar_notes(
+    *,
+    people: int,
+    mounting: str,
+    bad_orientation: bool,
+    shading: bool,
+    triple_mode: str,
+    need_crane: str,
+    wants_install: bool,
+    replace_old: str,
+    floor_install: str,
+    has_hot_cold_stubs: str | None,
+    has_boiler_lines: str | None,
+    monthly_pref: str | None,
+) -> str:
+    notes = [
+        f"Άτομα χρήσης: {people}",
+        f"Τρόπος τοποθέτησης: {mounting}",
+    ]
+    if bad_orientation:
+        notes.append("Μη ιδανικός προσανατολισμός/κλίση: επιλέχθηκε μεγαλύτερη επιφάνεια συλλέκτη όπου εφαρμόζεται.")
+    if shading:
+        notes.append("Υπάρχει σκίαση και πρέπει να ληφθεί υπόψη στην τελική πρόταση.")
+    if triple_mode in ("boiler", "hp"):
+        notes.append("Η τριπλή ενέργεια δεν προτείνεται γενικά, εκτός από ειδικές περιπτώσεις.")
+        if has_boiler_lines == NO:
+            notes.append("Δεν υπάρχουν γραμμές λέβητα/ΑΘ μέχρι τον ηλιακό, άρα μπορεί να απαιτηθούν πρόσθετες εργασίες.")
+    if wants_install:
+        if replace_old == YES:
+            notes.append("Περιλαμβάνεται αποξήλωση παλιού ηλιακού, χωρίς ανακύκλωση παλιάς συσκευής.")
+        if floor_install:
+            notes.append(f"Δηλωμένος όροφος εγκατάστασης: {floor_install}.")
+        if has_hot_cold_stubs == NO:
+            notes.append("Δεν υπάρχουν αναμονές ζεστού/κρύου στο σημείο εγκατάστασης.")
+        if need_crane == YES:
+            notes.append("Έχει δηλωθεί ανάγκη χρήσης γερανού.")
+    if monthly_pref:
+        notes.append(f"Προτίμηση μηνιαίας δόσης πελάτη: {monthly_pref}.")
+    notes.append(SOLAR_DISCLAIMER)
+    return "\n".join(notes)
+
+
+def build_solar_offer_pdf(
+    *,
+    proposal,
+    name: str,
+    phone: str,
+    email: str,
+    address: str,
+    people: int,
+    mounting: str,
+    has_program: bool,
+    subsidy_rate: float,
+    wants_install: bool,
+    bad_orientation: bool,
+    shading: bool,
+    triple_mode: str,
+    need_crane: str,
+    replace_old: str,
+    floor_install: str,
+    has_hot_cold_stubs: str | None,
+    has_boiler_lines: str | None,
+    monthly_pref: str | None,
+) -> bytes:
+    shared_notes = build_solar_notes(
+        people=people,
+        mounting=mounting,
+        bad_orientation=bad_orientation,
+        shading=shading,
+        triple_mode=triple_mode,
+        need_crane=need_crane,
+        wants_install=wants_install,
+        replace_old=replace_old,
+        floor_install=floor_install,
+        has_hot_cold_stubs=has_hot_cold_stubs,
+        has_boiler_lines=has_boiler_lines,
+        monthly_pref=monthly_pref,
+    )
+
+    delta_subsidy = proposal.delta_total - proposal.delta_customer_share
+
+    products = [
+        ProductLine(
+            description=f"Κύρια πρόταση - {model_label(proposal.delta_model)}",
+            quantity=1,
+            unit="πακέτο",
+            unit_price=proposal.delta_total,
+            notes=option_notes(
+                product_price=proposal.delta_product_price,
+                install_cost=proposal.install_cost,
+                total=proposal.delta_total,
+                customer_share=proposal.delta_customer_share,
+                monthly_payment=proposal.delta_monthly_payment,
+                has_program=has_program,
+                subsidy_rate=subsidy_rate,
+                wants_install=wants_install,
+            ),
+        ),
+        ProductLine(
+            description=f"Εναλλακτική πρόταση - {model_label(proposal.calpak_model)}",
+            quantity=1,
+            unit="πακέτο",
+            unit_price=proposal.calpak_total,
+            notes=option_notes(
+                product_price=proposal.calpak_product_price,
+                install_cost=proposal.install_cost,
+                total=proposal.calpak_total,
+                customer_share=proposal.calpak_customer_share,
+                monthly_payment=proposal.calpak_monthly_payment,
+                has_program=has_program,
+                subsidy_rate=subsidy_rate,
+                wants_install=wants_install,
+            ),
+        ),
+    ]
+
+    financing_options = []
+    if proposal.delta_monthly_payment > 0:
+        financing_options.append(
+            FinancingOption(
+                name="Delta Solar - 36 δόσεις",
+                installments=36,
+                monthly_amount=proposal.delta_monthly_payment,
+                total_amount=proposal.delta_monthly_payment * 36,
+                note="Ενδεικτική δόση βάσει του υπάρχοντος υπολογισμού.",
+            )
+        )
+    if proposal.calpak_monthly_payment > 0:
+        financing_options.append(
+            FinancingOption(
+                name="Calpak - 36 δόσεις",
+                installments=36,
+                monthly_amount=proposal.calpak_monthly_payment,
+                total_amount=proposal.calpak_monthly_payment * 36,
+                note="Ενδεικτική δόση βάσει του υπάρχοντος υπολογισμού.",
+            )
+        )
+
+    customer = {
+        "full_name": name,
+        "phone": phone,
+        "email": email,
+        "area": address,
+        "comments": shared_notes,
+    }
+
+    disclaimer = (
+        f"{shared_notes}\n\n"
+        "Στα σύνολα εμφανίζεται η κύρια πρόταση Delta Solar. "
+        "Η Calpak εμφανίζεται ως εναλλακτική πρόταση στον πίνακα προϊόντων."
+    )
+
+    return create_offer_pdf(
+        customer=customer,
+        products=products,
+        offer_title="Προσφορά ηλιακού θερμοσίφωνα",
+        offer_number=f"SOLAR-{datetime.now().strftime('%Y%m%d-%H%M')}",
+        totals=OfferTotals(
+            subtotal=proposal.delta_total,
+            discount=delta_subsidy,
+            vat_rate=0,
+            vat_amount=0,
+            total=proposal.delta_customer_share,
+        ),
+        financing_options=financing_options,
+        disclaimer=disclaimer,
+    )
 
 
 st.set_page_config(
@@ -276,5 +515,43 @@ if submitted:
     contact_lines = [line for line in [name, phone, email, address] if line]
     if contact_lines:
         st.caption("Στοιχεία πελάτη: " + " | ".join(contact_lines))
+
+    st.divider()
+    st.subheader("PDF προσφοράς")
+    if PDF_IMPORT_ERROR is not None:
+        st.error("Λείπει η βιβλιοθήκη `reportlab`. Εκτελέστε `pip install -r requirements.txt` για δημιουργία PDF.")
+    else:
+        try:
+            pdf_bytes = build_solar_offer_pdf(
+                proposal=proposal,
+                name=name,
+                phone=phone,
+                email=email,
+                address=address,
+                people=people,
+                mounting=mounting,
+                has_program=has_program,
+                subsidy_rate=subsidy_rate,
+                wants_install=wants_install,
+                bad_orientation=bad_orientation,
+                shading=proposal.shading,
+                triple_mode=triple_mode,
+                need_crane=need_crane,
+                replace_old=replace_old,
+                floor_install=floor_install,
+                has_hot_cold_stubs=has_hot_cold_stubs,
+                has_boiler_lines=has_boiler_lines,
+                monthly_pref=monthly_pref,
+            )
+        except GreekFontError as exc:
+            st.error(str(exc))
+        else:
+            st.download_button(
+                "Λήψη PDF προσφοράς",
+                data=pdf_bytes,
+                file_name="prosfora_iliakou_thermosifona.pdf",
+                mime="application/pdf",
+                type="primary",
+            )
 else:
     st.info("Συμπληρώστε τα στοιχεία και πατήστε «Υπολογισμός πρότασης ηλιακού».")
