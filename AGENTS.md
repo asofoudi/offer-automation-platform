@@ -47,5 +47,5 @@ offer preparation, pricing helpers, and future business automation pages.
 - Heat-pump questionnaire: migrated as a Streamlit page with summary generation in `utils/`.
 - Solar questions: migrated as a Streamlit page with proposal calculations in `utils/`.
 - Insulation: migrated as a BOM and pricing page with ERP codes in `utils/`.
-- Radiators: placeholder only.
+- Radiators: migrated as a pricing page with data in `data/radiators.csv` and calculations in `utils/radiators.py`.
 - Air conditioners: placeholder only.
