@@ -131,27 +131,146 @@ class HeatPumpAlternativeQuote:
     additional_cost: float
 
 
+def default_heat_pump_models() -> list[HeatPumpModel]:
+    return [
+        HeatPumpModel(
+            model_id="hyundai_model_s_8",
+            brand="Hyundai",
+            model_name="Model S 8 kW",
+            series="Economy",
+            kw=8,
+            voltage="230V",
+            price=2690,
+            image_path="assets/heat_pumps/hyundai_model_s_8.png",
+            description="Οικονομική επιλογή για μικρομεσαίες κατοικίες",
+            cop="",
+            dimensions="",
+            erp_code="",
+        ),
+        HeatPumpModel(
+            model_id="hyundai_compact_9",
+            brand="Hyundai",
+            model_name="Compact 9 kW",
+            series="Compact",
+            kw=9,
+            voltage="230V",
+            price=3490,
+            image_path="assets/heat_pumps/hyundai_compact_9.png",
+            description="Εναλλακτική compact λύση με υψηλότερο κόστος",
+            cop="",
+            dimensions="",
+            erp_code="",
+            is_alternative=True,
+        ),
+        HeatPumpModel(
+            model_id="generic_heat_pump_10",
+            brand="",
+            model_name="Αντλία 10 kW",
+            series="Placeholder",
+            kw=10,
+            voltage="",
+            price=4000,
+            image_path="",
+            description="Placeholder γραμμή μέχρι να δοθούν τελικά εμπορικά στοιχεία",
+            cop="",
+            dimensions="",
+            erp_code="",
+        ),
+        HeatPumpModel(
+            model_id="generic_heat_pump_12",
+            brand="",
+            model_name="Αντλία 12 kW",
+            series="Placeholder",
+            kw=12,
+            voltage="",
+            price=4350,
+            image_path="",
+            description="Placeholder γραμμή μέχρι να δοθούν τελικά εμπορικά στοιχεία",
+            cop="",
+            dimensions="",
+            erp_code="",
+        ),
+        HeatPumpModel(
+            model_id="generic_heat_pump_16",
+            brand="",
+            model_name="Αντλία 16 kW",
+            series="Placeholder",
+            kw=16,
+            voltage="",
+            price=4590,
+            image_path="",
+            description="Placeholder γραμμή μέχρι να δοθούν τελικά εμπορικά στοιχεία",
+            cop="",
+            dimensions="",
+            erp_code="",
+        ),
+        HeatPumpModel(
+            model_id="generic_heat_pump_26",
+            brand="",
+            model_name="Αντλία 26 kW",
+            series="Placeholder",
+            kw=26,
+            voltage="",
+            price=7410,
+            image_path="",
+            description="Placeholder γραμμή μέχρι να δοθούν τελικά εμπορικά στοιχεία",
+            cop="",
+            dimensions="",
+            erp_code="",
+        ),
+    ]
+
+
 def load_heat_pump_models(path: Path = HEAT_PUMP_MODEL_FILE) -> list[HeatPumpModel]:
-    with path.open("r", encoding="utf-8-sig", newline="") as file:
-        reader = csv.DictReader(file)
-        return [
-            HeatPumpModel(
-                model_id=row["model_id"],
-                brand=row["brand"],
-                model_name=row["model_name"],
-                series=row["series"],
-                kw=int(float(row["kw"])),
-                voltage=row["voltage"],
-                price=float(row["price"]),
-                image_path=row["image_path"],
-                description=row["description"],
-                cop=row["cop"],
-                dimensions=row["dimensions"],
-                erp_code=row["erp_code"],
-                is_alternative=row["model_id"] == "hyundai_compact_9",
-            )
-            for row in reader
-        ]
+    required_fields = {
+        "model_id",
+        "brand",
+        "model_name",
+        "series",
+        "kw",
+        "voltage",
+        "price",
+        "image_path",
+        "description",
+        "cop",
+        "dimensions",
+        "erp_code",
+    }
+    if not path.exists():
+        return default_heat_pump_models()
+
+    models: list[HeatPumpModel] = []
+    try:
+        with path.open("r", encoding="utf-8-sig", newline="") as file:
+            reader = csv.DictReader(file)
+            if not reader.fieldnames or not required_fields.issubset(set(reader.fieldnames)):
+                return default_heat_pump_models()
+
+            for row in reader:
+                try:
+                    models.append(
+                        HeatPumpModel(
+                            model_id=(row.get("model_id") or "").strip(),
+                            brand=(row.get("brand") or "").strip(),
+                            model_name=(row.get("model_name") or "").strip(),
+                            series=(row.get("series") or "").strip(),
+                            kw=int(float(row.get("kw") or 0)),
+                            voltage=(row.get("voltage") or "").strip(),
+                            price=float(row.get("price") or 0),
+                            image_path=(row.get("image_path") or "").strip(),
+                            description=(row.get("description") or "").strip(),
+                            cop=(row.get("cop") or "").strip(),
+                            dimensions=(row.get("dimensions") or "").strip(),
+                            erp_code=(row.get("erp_code") or "").strip(),
+                            is_alternative=(row.get("model_id") or "").strip() == "hyundai_compact_9",
+                        )
+                    )
+                except (TypeError, ValueError):
+                    continue
+    except (OSError, UnicodeDecodeError, csv.Error):
+        return default_heat_pump_models()
+
+    return models or default_heat_pump_models()
 
 
 AVAILABLE_MODELS = load_heat_pump_models()
