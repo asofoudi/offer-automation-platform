@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import csv
 import math
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 
 
 YES = "Ναι"
 NO = "Όχι"
 INSTALLMENT_MONTHS = 36
 ANNUAL_INSTALLMENT_RATE = 0.13
+HEAT_PUMP_MODEL_FILE = Path(__file__).resolve().parents[1] / "data" / "heat_pump_models.csv"
+PRIMARY_MODEL_KW = {8, 10, 12, 16, 26}
 
 
 @dataclass(frozen=True)
@@ -57,10 +61,28 @@ class HeatPumpQuestionnaire:
 
 @dataclass(frozen=True)
 class HeatPumpModel:
-    name: str
+    model_id: str
+    brand: str
+    model_name: str
+    series: str
     kw: int
+    voltage: str
     price: float
+    image_path: str
+    description: str
+    cop: str
+    dimensions: str
+    erp_code: str
     is_alternative: bool = False
+
+    @property
+    def name(self) -> str:
+        parts = [self.brand.strip(), self.model_name.strip()]
+        return " ".join(part for part in parts if part)
+
+    @property
+    def display_name(self) -> str:
+        return self.name or f"Αντλία {self.kw} kW"
 
 
 @dataclass(frozen=True)
@@ -94,20 +116,65 @@ class HeatPumpOfferResult:
         return f"{self.low_kw:.1f} - {self.high_kw:.1f} kW (κέντρο ~{self.avg_kw:.1f} kW)"
 
 
-AVAILABLE_MODELS = [
-    HeatPumpModel("Hyundai Model S 8 kW", 8, 2690),
-    HeatPumpModel("Αντλία 10 kW", 10, 4000),
-    HeatPumpModel("Αντλία 12 kW", 12, 4350),
-    HeatPumpModel("Αντλία 16 kW", 16, 4590),
-    HeatPumpModel("Αντλία 26 kW", 26, 7410),
-]
+@dataclass(frozen=True)
+class HeatPumpAlternativeQuote:
+    model: HeatPumpModel
+    pump_cost: float
+    labor_materials_cost: float
+    solar_cost: float
+    total_cost: float
+    subsidy_rate: float
+    subsidy_amount: float
+    customer_contribution: float
+    monthly_installment: float | None
+    installment_total: float | None
+    additional_cost: float
 
-ALTERNATIVE_MODEL_9KW = HeatPumpModel(
-    "Hyundai Compact 9 kW",
-    9,
-    3490,
-    is_alternative=True,
-)
+
+def load_heat_pump_models(path: Path = HEAT_PUMP_MODEL_FILE) -> list[HeatPumpModel]:
+    with path.open("r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+        return [
+            HeatPumpModel(
+                model_id=row["model_id"],
+                brand=row["brand"],
+                model_name=row["model_name"],
+                series=row["series"],
+                kw=int(float(row["kw"])),
+                voltage=row["voltage"],
+                price=float(row["price"]),
+                image_path=row["image_path"],
+                description=row["description"],
+                cop=row["cop"],
+                dimensions=row["dimensions"],
+                erp_code=row["erp_code"],
+                is_alternative=row["model_id"] == "hyundai_compact_9",
+            )
+            for row in reader
+        ]
+
+
+AVAILABLE_MODELS = load_heat_pump_models()
+
+
+def primary_heat_pump_models(models: list[HeatPumpModel] | None = None) -> list[HeatPumpModel]:
+    models = models or AVAILABLE_MODELS
+    return sorted(
+        [
+            model
+            for model in models
+            if model.kw in PRIMARY_MODEL_KW and model.model_id != "hyundai_compact_9"
+        ],
+        key=lambda model: model.kw,
+    )
+
+
+def compact_9kw_model(models: list[HeatPumpModel] | None = None) -> HeatPumpModel | None:
+    models = models or AVAILABLE_MODELS
+    for model in models:
+        if model.model_id == "hyundai_compact_9":
+            return model
+    return None
 
 
 def base_w_per_m2_for_year(year_category: str) -> float:
@@ -214,14 +281,84 @@ def pick_model_for_kw(avg_kw: float | None) -> tuple[HeatPumpModel | None, HeatP
         return None, None, None
 
     target_kw = avg_kw * 1.05
-    suitable = [model for model in AVAILABLE_MODELS if model.kw >= target_kw]
-    selected = suitable[0] if suitable else AVAILABLE_MODELS[-1]
+    primary_models = primary_heat_pump_models()
+    suitable = [model for model in primary_models if model.kw >= target_kw]
+    selected = suitable[0] if suitable else primary_models[-1]
 
     alternative = None
-    if 8 < target_kw <= ALTERNATIVE_MODEL_9KW.kw and selected.kw == 10:
-        alternative = ALTERNATIVE_MODEL_9KW
+    compact_model = compact_9kw_model()
+    if compact_model and 8 < target_kw <= compact_model.kw and selected.kw == 10:
+        alternative = compact_model
 
     return selected, alternative, target_kw
+
+
+def compatible_heat_pump_models(
+    target_kw: float | None,
+    models: list[HeatPumpModel] | None = None,
+) -> list[HeatPumpModel]:
+    models = models or AVAILABLE_MODELS
+    if target_kw is None:
+        return []
+
+    compatible = [model for model in models if model.kw >= target_kw]
+    if not compatible:
+        compatible = [max(models, key=lambda model: model.kw)]
+
+    return sorted(compatible, key=lambda model: (model.price, model.kw, model.display_name))
+
+
+def quote_heat_pump_model_alternative(
+    model: HeatPumpModel,
+    answers: HeatPumpQuestionnaire,
+    cheapest_total_cost: float,
+) -> HeatPumpAlternativeQuote:
+    pump_cost = model.price
+    labor_materials_cost = labor_materials_for_kw(model.kw)
+    solar_cost = solar_cost_for_answers(answers)
+    total_cost = pump_cost + labor_materials_cost + solar_cost
+    subsidy_rate = subsidy_rate_for_answers(answers)
+    subsidy_amount = total_cost * subsidy_rate
+    customer_contribution = total_cost - subsidy_amount
+
+    monthly_installment = None
+    installment_total = None
+    if answers.wants_installments == YES and customer_contribution > 0:
+        monthly_installment = annuity_payment(customer_contribution)
+        installment_total = monthly_installment * INSTALLMENT_MONTHS
+
+    return HeatPumpAlternativeQuote(
+        model=model,
+        pump_cost=pump_cost,
+        labor_materials_cost=labor_materials_cost,
+        solar_cost=solar_cost,
+        total_cost=total_cost,
+        subsidy_rate=subsidy_rate,
+        subsidy_amount=subsidy_amount,
+        customer_contribution=customer_contribution,
+        monthly_installment=monthly_installment,
+        installment_total=installment_total,
+        additional_cost=max(total_cost - cheapest_total_cost, 0),
+    )
+
+
+def heat_pump_alternative_quotes(
+    models: list[HeatPumpModel],
+    answers: HeatPumpQuestionnaire,
+) -> list[HeatPumpAlternativeQuote]:
+    raw_totals = [
+        model.price + labor_materials_for_kw(model.kw) + solar_cost_for_answers(answers)
+        for model in models
+    ]
+    cheapest_total_cost = min(raw_totals) if raw_totals else 0
+    return [
+        quote_heat_pump_model_alternative(
+            model=model,
+            answers=answers,
+            cheapest_total_cost=cheapest_total_cost,
+        )
+        for model in models
+    ]
 
 
 def labor_materials_for_kw(kw: int) -> float:
@@ -338,6 +475,30 @@ def format_euro(value: float) -> str:
 def format_euro_rounded(value: float) -> str:
     formatted = f"{value:,.0f}".replace(",", ".")
     return f"{formatted} €"
+
+
+def heat_pump_alternatives_for_display(
+    quotes: list[HeatPumpAlternativeQuote],
+) -> list[dict[str, str]]:
+    rows = []
+    for quote in quotes:
+        model = quote.model
+        rows.append(
+            {
+                "Μοντέλο": model.display_name,
+                "Σειρά": model.series,
+                "Ισχύς": f"{model.kw} kW",
+                "Τάση": model.voltage or "-",
+                "Τιμή αντλίας": format_euro_rounded(quote.pump_cost),
+                "Εργασίες & υλικά": format_euro_rounded(quote.labor_materials_cost),
+                "Σύνολο προ επιδότησης": format_euro_rounded(quote.total_cost),
+                "Επιπλέον από οικονομικότερη": format_euro_rounded(quote.additional_cost),
+                "Συμμετοχή πελάτη": format_euro_rounded(quote.customer_contribution),
+                "ERP": model.erp_code or "-",
+                "Περιγραφή": model.description,
+            }
+        )
+    return rows
 
 
 def _indent_multiline(text: str, prefix: str = "  ") -> str:

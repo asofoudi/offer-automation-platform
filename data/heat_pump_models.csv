@@ -1,0 +1,7 @@
+model_id,brand,model_name,series,kw,voltage,price,image_path,description,cop,dimensions,erp_code
+hyundai_model_s_8,Hyundai,Model S 8 kW,Economy,8,230V,2690,assets/heat_pumps/hyundai_model_s_8.png,Οικονομική επιλογή για μικρομεσαίες κατοικίες,,,
+hyundai_compact_9,Hyundai,Compact 9 kW,Compact,9,230V,3490,assets/heat_pumps/hyundai_compact_9.png,Εναλλακτική compact λύση με υψηλότερο κόστος,,,
+generic_heat_pump_10,,Αντλία 10 kW,Placeholder,10,,4000,,Placeholder γραμμή μέχρι να δοθούν τελικά εμπορικά στοιχεία,,,
+generic_heat_pump_12,,Αντλία 12 kW,Placeholder,12,,4350,,Placeholder γραμμή μέχρι να δοθούν τελικά εμπορικά στοιχεία,,,
+generic_heat_pump_16,,Αντλία 16 kW,Placeholder,16,,4590,,Placeholder γραμμή μέχρι να δοθούν τελικά εμπορικά στοιχεία,,,
+generic_heat_pump_26,,Αντλία 26 kW,Placeholder,26,,7410,,Placeholder γραμμή μέχρι να δοθούν τελικά εμπορικά στοιχεία,,,
