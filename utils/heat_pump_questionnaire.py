@@ -273,11 +273,19 @@ def load_heat_pump_models(path: Path = HEAT_PUMP_MODEL_FILE) -> list[HeatPumpMod
     return models or default_heat_pump_models()
 
 
-AVAILABLE_MODELS = load_heat_pump_models()
+AVAILABLE_MODELS = default_heat_pump_models()
+_AVAILABLE_MODELS_CACHE: list[HeatPumpModel] | None = None
+
+
+def available_heat_pump_models() -> list[HeatPumpModel]:
+    global _AVAILABLE_MODELS_CACHE
+    if _AVAILABLE_MODELS_CACHE is None:
+        _AVAILABLE_MODELS_CACHE = load_heat_pump_models()
+    return _AVAILABLE_MODELS_CACHE
 
 
 def primary_heat_pump_models(models: list[HeatPumpModel] | None = None) -> list[HeatPumpModel]:
-    models = models or AVAILABLE_MODELS
+    models = models or available_heat_pump_models()
     return sorted(
         [
             model
@@ -289,7 +297,7 @@ def primary_heat_pump_models(models: list[HeatPumpModel] | None = None) -> list[
 
 
 def compact_9kw_model(models: list[HeatPumpModel] | None = None) -> HeatPumpModel | None:
-    models = models or AVAILABLE_MODELS
+    models = models or available_heat_pump_models()
     for model in models:
         if model.model_id == "hyundai_compact_9":
             return model
@@ -416,7 +424,7 @@ def compatible_heat_pump_models(
     target_kw: float | None,
     models: list[HeatPumpModel] | None = None,
 ) -> list[HeatPumpModel]:
-    models = models or AVAILABLE_MODELS
+    models = models or available_heat_pump_models()
     if target_kw is None:
         return []
 
