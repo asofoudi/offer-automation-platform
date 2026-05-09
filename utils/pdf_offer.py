@@ -22,6 +22,11 @@ ASSETS_DIR = PROJECT_ROOT / "assets"
 DEFAULT_FONT_PATH = ASSETS_DIR / "DejaVuSans.ttf"
 DEFAULT_LOGO_PATH = ASSETS_DIR / "logo.png"
 
+COMPANY_NAME = "Α. Αργυριαδου - Α. Σοφουδης Ο.Ε."
+COMPANY_ADDRESS = "2o χλμ Χρυσούπολης - Καβάλας"
+COMPANY_PHONE = "25910 22328"
+COMPANY_EMAIL = "info@argiriadou.gr"
+
 BRAND_PRIMARY = "#17313A"
 BRAND_SECONDARY = "#244653"
 BRAND_ACCENT = "#C59A3B"
@@ -55,10 +60,10 @@ class RegisteredFonts:
 
 @dataclass(frozen=True)
 class CompanyInfo:
-    name: str = "Η εταιρεία σας"
-    address: str = ""
-    phone: str = ""
-    email: str = ""
+    name: str = COMPANY_NAME
+    address: str = COMPANY_ADDRESS
+    phone: str = COMPANY_PHONE
+    email: str = COMPANY_EMAIL
     tax_id: str = ""
     tax_office: str = ""
     logo_path: str | Path | None = DEFAULT_LOGO_PATH
@@ -505,10 +510,10 @@ def normalize_company(
 
     company_data = object_to_dict(company)
     return CompanyInfo(
-        name=str(value_from(company_data, "name", "company_name", "Επωνυμία") or "Η εταιρεία σας"),
-        address=str(value_from(company_data, "address", "Διεύθυνση") or ""),
-        phone=str(value_from(company_data, "phone", "telephone", "Τηλέφωνο") or ""),
-        email=str(value_from(company_data, "email", "Email") or ""),
+        name=str(value_from(company_data, "name", "company_name", "Επωνυμία") or COMPANY_NAME),
+        address=str(value_from(company_data, "address", "Διεύθυνση") or COMPANY_ADDRESS),
+        phone=str(value_from(company_data, "phone", "telephone", "Τηλέφωνο") or COMPANY_PHONE),
+        email=str(value_from(company_data, "email", "Email") or COMPANY_EMAIL),
         tax_id=str(value_from(company_data, "tax_id", "vat_number", "ΑΦΜ") or ""),
         tax_office=str(value_from(company_data, "tax_office", "ΔΟΥ") or ""),
         logo_path=resolve_default_path(
